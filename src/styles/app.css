@@ -1,0 +1,60 @@
+.app-page{
+  width: 100%;
+}
+.app-search .el-input{
+  width: 200px;
+}
+.app-search .app-btn-group.el-row{
+  text-align: right;
+}
+.app-form{
+  margin: 20px auto;
+  width: 70%;
+}
+.app-page .dialog-footer{
+  margin-top: 20px;
+  text-align: center;
+}
+
+.app-nav{
+  position: relative;
+}
+.app-head-btns{
+  position: absolute;
+  right: 0;
+  top: -10px;
+}
+.app-list{
+  padding-top: 20px;
+}
+/*表格太宽的情况*/
+.app-tables-col{
+  position: relative;
+}
+.app-tables-col .app-head-btns{
+  top: -42px;
+}
+.app-tables-col7{
+  width: 70%;
+}
+
+@media screen and ( max-width: 1280px ) {
+  .app-tables-col{
+    width: 100%!important;
+  }
+}
+/*对话框中的穿梭框居中设置*/
+.app-dialog-transfer{
+  margin-left: 20px;
+}
+.app-dialog-transfer .el-transfer-panel{
+  width: 280px!important;
+}
+/*设置表格中有select框的样式*/
+.el-select-reset{
+  margin: -4px 0 -8px 0;
+}
+.el-select-reset .el-input__suffix{
+  right:10px!important;
+}
+

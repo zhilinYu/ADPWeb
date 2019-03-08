@@ -1,0 +1,260 @@
+<template>
+    <div class="page-wrapper" v-loading="loading">
+      <!-- <el-button size="mini" @click="backBtn">返回</el-button> -->
+
+      <!-- 面包屑导航 -->
+      <!-- 主体管理 -->
+      <el-breadcrumb separator-class="el-icon-arrow-right" v-if="fromPage == 0 || fromPage == 1">
+        <el-breadcrumb-item :to="{ path: 'subject_manage' }">主体列表</el-breadcrumb-item>
+        <el-breadcrumb-item>{{ fromPage == 0 ? '原始图片' : '有效图片' }}</el-breadcrumb-item>
+      </el-breadcrumb>
+
+      <!-- 爬虫管理 -->
+      <el-breadcrumb separator-class="el-icon-arrow-right" v-else-if="fromPage == 2">
+        <el-breadcrumb-item :to="{ path: '/distribution_list' }">清洗分配</el-breadcrumb-item>
+        <el-breadcrumb-item>原始图片</el-breadcrumb-item>
+      </el-breadcrumb>
+
+      <el-breadcrumb separator-class="el-icon-arrow-right" v-else-if="fromPage == 3">
+        <el-breadcrumb-item :to="{ path: '/crawler_modules' }">任务管理</el-breadcrumb-item>
+        <el-breadcrumb-item :to="{ path: `/crawler_modules/task_subject_list?taskId=${taskId}` }">主体列表</el-breadcrumb-item>
+        <el-breadcrumb-item>爬虫图片</el-breadcrumb-item>
+      </el-breadcrumb>
+
+      <!-- 清洗管理 -->
+      <el-breadcrumb separator-class="el-icon-arrow-right" v-else-if="fromPage == 5">
+        <el-breadcrumb-item :to="{ path: '/clean_list' }">清洗列表</el-breadcrumb-item>
+        <el-breadcrumb-item>原始图片</el-breadcrumb-item>
+      </el-breadcrumb>
+
+      <el-breadcrumb separator-class="el-icon-arrow-right" v-else-if="fromPage == 4">
+        <el-breadcrumb-item :to="{ path: '/examine_data' }">审核列表</el-breadcrumb-item>
+        <el-breadcrumb-item>审核详情</el-breadcrumb-item>
+      </el-breadcrumb>
+
+      <!-- 移交管理 -->
+      <el-breadcrumb separator-class="el-icon-arrow-right" v-else-if="fromPage == 6">
+        <el-breadcrumb-item :to="{ path: '/data_deliver/data_deliver_history' }">移交记录</el-breadcrumb-item>
+        <el-breadcrumb-item :to="{ path: `/data_deliver/deliver_subject?id=${taskId}` }">主体列表</el-breadcrumb-item>
+        <el-breadcrumb-item>移交图片</el-breadcrumb-item>
+      </el-breadcrumb>
+
+      <div class="page-search">
+        <!-- 保留图片 -->
+        <el-radio-group v-model="radioStatus" @change="selectByWebsite" v-if="fromPage == 1">
+          <el-radio :label="0">有效图片({{validNum}})</el-radio>
+        </el-radio-group>
+        <!-- 审核情况页面图片 -->
+        <el-radio-group v-model="radioStatus" @change="selectByWebsite" v-else-if="fromPage == 4">
+          <el-radio :label="0">全部({{totalNum}})</el-radio>
+          <el-radio v-for="rItem in websitesInfo" :key="rItem.name" :label="rItem.name">
+            {{rItem.name}} ({{ rItem.retentionCount }}/{{ rItem.count }})
+          </el-radio>
+          <br>
+          <el-radio 
+            v-for="item in picStatus" 
+            :key="item.label" 
+            :label="item.label === '保留' ? 1 : 2">
+            {{ item.label }} ({{ item.count }})
+          </el-radio>
+        </el-radio-group>
+        <!-- 移交图片 -->
+        <el-radio-group v-model="radioStatus" @change="selectByWebsite" v-else-if="fromPage == 6">
+          <el-radio :label="0">移交图片({{deliverCount}})</el-radio>
+        </el-radio-group>
+        <!-- 原始图片 -->
+        <el-radio-group v-model="radioStatus" @change="selectByWebsite" v-else>
+          <el-radio :label="0">全部({{totalNum}})</el-radio>
+          <el-radio v-for="rItem in websitesInfo" :key="rItem.name" :label="rItem.name">
+            {{rItem.name}} ({{ rItem.count }})
+          </el-radio>
+        </el-radio-group>
+      </div>
+
+      <!-- 图片列表 -->
+      <div class="picCard" v-for="(item, index) in picsInfo" :key="index">
+        <el-card :body-style="{ padding: '0px' }">
+          <div style="width: 280px; height: 280px; padding: 5px;">
+            <img :src="`${item.absAddress}/${item.website}/${item.img_name}`" style="width: 100%; height: 100%; border: 1px solid #eee;">
+          </div>
+        </el-card>
+      </div>
+    </div>
+</template>
+
+<script>
+  import request from '../axios/request';
+
+  export default {
+    name: "picCrawlerDetail",
+    data(){
+      return{
+        load: '',
+        loading: false,
+        isBusy: false,
+        radioStatus: 0,                    // 保存选择的网站信息   0: 全部; 1: 保留; 2：删除
+        paramRadio: '',
+        status: '',                        //请求数据状态
+        deliverStatus: 0,               //图片移交状态          0：未移交，1:已移交
+        // 分页数据
+        currentPage: 1,
+        pageSize: 100, 
+        totalNum: 0,                       // 原始图片总数量
+        validNum: 0,                       // 有效图片数量
+        deliverCount: 0,                   // 移交图片数量
+        totalSize: 0,
+        // 图片网站信息
+        picStatus: [],
+        picsInfo: [],
+        websitesInfo: [],
+
+        taskId: null,                       //任务id
+
+        fromPage: null,                     // 0: 主体管理-原始图片; 1: 主体管理-有效图片; 2:爬虫管理-清洗分配; 3: 任务管理-主体列表; 4: 清洗管理-审核详情; 5: 清洗管理-原始图片; 6: 移交管理;
+      }
+    },
+    computed:{
+      subjectId:function () {
+        return this.$route.query.id;
+      },
+    },
+    async created() {
+      //获取任务id
+      if(this.$route.query.taskId){
+        this.taskId = this.$route.query.taskId;
+      }
+
+      this.fromPage = this.$route.query.pageFrom;
+      if(this.fromPage == 1){                      //保留
+        this.status = 1;
+      }else if(this.fromPage == 6){                //移交
+        this.status = 1;
+        this.deliverStatus = 1;
+      }
+        await this.getCrawlerPicList();
+      },
+    mounted(){
+      document.getElementById('waterFall').addEventListener('scroll',this.handler,false);
+    },
+    destroyed(){
+      document.getElementById('waterFall').removeEventListener('scroll',this.handler, false);
+    },
+    methods:{
+      // 返回按钮
+      backBtn() {
+        this.$router.push({ path: `/clean_list` });
+      },
+      // 顶部搜索筛选 - 单选框改变
+      async selectByWebsite(){
+        if (typeof this.radioStatus === 'string') {
+          this.paramRadio = this.radioStatus;
+          this.status = '';
+        } else if (this.radioStatus === 0) {
+          this.paramRadio = '';
+          this.status = '';
+        } else {
+          this.paramRadio = '';
+          this.status = this.radioStatus;
+        }
+
+        this.currentPage = 1;
+        this.picsInfo = []; // 筛选清空数据
+        await this.getCrawlerPicList();
+      },    
+      addItems() {
+        if (this.currentPage  < this.totalSize){
+          this.isBusy = true;
+          this.load = this.$loading({
+            lock: true,
+            text: 'Loading',
+            // spinner: 'el-icon-loading',
+            background: 'rgba(0, 0, 0, 0.7)'
+          });
+          // this.loading = true;
+          if (window.sessionStorage.getItem('picDetailCurrPage')){
+            this.currentPage = parseInt(window.sessionStorage.getItem('picDetailCurrPage'))+1;
+            this.getCrawlerPicList();
+            this.load.close();
+          }
+        }else {
+          return false;
+        }
+
+      },
+      handler() {
+        let that = this;
+        let _this = document.getElementById('waterFall');
+        let scrollTop = _this.scrollTop,
+            scrollHeight = _this.scrollHeight,
+            offsetHeight = _this.offsetHeight;
+        if (scrollTop + offsetHeight >= scrollHeight) {
+          that.addItems();
+        } 
+        
+        if(that.picsInfo.length == this.totalNum){
+          if (scrollTop + offsetHeight >= scrollHeight) {
+            that.common.msgModal("warning", "数据已加载完!");
+          } 
+        }
+      },
+      //获取图片资源
+      async getCrawlerPicList(){
+        this.loading = true;
+        window.sessionStorage.setItem('picDetailCurrPage',this.currentPage);
+        let { data } = await request.get(`/pic/manage/v1/pictureList?idWebsite=${this.paramRadio}&idSubject=${this.subjectId}&currentPage=${this.currentPage}&pageSize=100&status=${this.status}&deliverStatus=${this.deliverStatus}`);
+        let outData = data.data;
+
+        this.totalNum = outData.totalCount;
+        this.validNum = outData.picStatus[0].count;                 //有效图片数量
+        this.deliverCount = outData.deliverCount                    //移交图片数量
+        this.picStatus = outData.picStatus;
+        this.websitesInfo = outData.websiteCount;
+        this.picsInfo = this.picsInfo.concat(outData.data);
+        this.totalSize = outData.totalCount/100;
+        this.loading = false;
+      },
+    }
+  };
+              
+</script>
+
+<style scoped>
+.picCard {
+  display: inline-block;
+  margin: 5px;
+}
+.page-wrapper{
+  height: 100%;
+}
+.page-search{
+  margin: 20px 0;
+}
+.vue-waterfall-slot{
+  padding: 5px;
+}
+.item {
+  position: absolute;
+  top: 5px;
+  left: 5px;
+  right: 5px;
+  bottom: 5px;
+  font-size: 1.2em;
+  color: rgb(0,158,107);
+}
+.item:after {
+  content: attr(index);
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  -webkit-transform: translate(-50%, -50%);
+  -ms-transform: translate(-50%, -50%);
+}
+.item img{
+  width: 100%;
+  height: 100%;
+}
+.el-radio {
+  margin: 5px 30px 5px 0;
+}
+</style>
